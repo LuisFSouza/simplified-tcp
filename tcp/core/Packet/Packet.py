@@ -1,10 +1,8 @@
 from tcp.core.Packet.Header import Header
 
 class Packet:
-    HEADER_SIZE = 8
-
-    def __init__(self, payload=b""):
-        self._header = Header()
+    def __init__(self, payload=b"", seq_number=0, ack_number=0, ack_flag=0, syn_flag=0, fin_flag=0):
+        self._header = Header(seq_number, ack_number, len(self._payload), 0, ack_flag, syn_flag, fin_flag)
         self._payload = bytes(payload)
 
     @property
@@ -30,13 +28,13 @@ class Packet:
 
     @classmethod
     def from_bytes(cls, data):
-        if len(data) < cls.HEADER_SIZE:
-            raise ValueError("Pacote inválido: menor que o header")
+        if len(data) < Header.SIZE:
+            raise ValueError(f"Pacote inválido: menor que {Header.SIZE} bytes")
 
-        header_bytes = data[:cls.HEADER_SIZE]
-        payload = data[cls.HEADER_SIZE:]
+        header_bytes = data[:Header.SIZE]
+        payload = data[Header.SIZE:]
 
         packet = cls(payload=payload)
         packet.header = Header.from_bytes(header_bytes)
-        
+
         return packet

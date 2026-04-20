@@ -1,10 +1,12 @@
 import logging
 from .TCPState import TCPState
-
+from .ListenState import ListenState
+from .ClosedState import ClosedState
 
 class LastAckState(TCPState):
-    def on_ack(self, packet, addr, event):
-        if event.ack_number == self.context.seq_number:
+    def on_ack(self, packet, addr):
+        header = packet.header
+        if header.ack_number == self.context.seq_number:
             logging.warning("ACK do FIN recebido. Encerrando conexao...")
             self._finalize_close()
         else:
@@ -16,8 +18,6 @@ class LastAckState(TCPState):
             self.context.send_base = self.context.seq_number
             self.context.remote_addr = None
         if self.context.is_listening:
-            from .ListenState import ListenState
             self.transition(ListenState)
         else:
-            from .ClosedState import ClosedState
             self.transition(ClosedState)

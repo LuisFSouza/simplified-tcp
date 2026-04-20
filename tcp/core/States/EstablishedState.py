@@ -5,8 +5,10 @@ from ctypes import c_uint16
 from .CloseWaitState import CloseWaitState
 
 class EstablishedState(TCPState):
-    def on_ack(self, packet, addr, event):
-        received_ack = event.ack_number
+    def on_ack(self, packet, addr):
+        now = time.time()
+        header = packet.header
+        received_ack = header.ack_number
         logging.info(f"ACK recebido: {received_ack}")
         keys_to_remove = []
         acked_bytes = 0
@@ -14,7 +16,6 @@ class EstablishedState(TCPState):
             if c_uint16(seq - self.context.send_base).value < c_uint16(received_ack - self.context.send_base).value:
                 keys_to_remove.append(seq)
 
-        now = time.time()
         for seq in sorted(keys_to_remove):
             pkt, sent_at = self.context.send_buffer[seq]
             payload_len = len(pkt.payload)
@@ -28,15 +29,19 @@ class EstablishedState(TCPState):
         self.context.congestion_control.ack_receive()
         self.context.metrics.record_acked(acked_bytes)
 
-    def on_data(self, packet, addr, event):
-        if event.data_len > 0:
-            logging.info(f"Dados recebidos ({event.data_len} bytes). Enviando ACK...")
-            self.context.ack_number = c_uint16(event.seq_number + event.data_len).value
+    def on_data(self, packet, addr):
+        header = packet.header
+        if header.len_data > 0:
+            logging.info(
+                f"Dados recebidos ({header.len_data} bytes). Enviando ACK...")
+            self.context.ack_number = c_uint16(
+                header.seq_number + header.len_data).value
             self.context.send_ack()
-            self.context.metrics.record_received(event.data_len)
+            self.context.metrics.record_received(header.len_data)
 
-    def on_fin(self, packet, addr, event):
+    def on_fin(self, packet, addr):
+        header = packet.header
         logging.warning("FIN recebido. Encerrando conexão...")
-        self.context.ack_number = c_uint16(event.seq_number + 1).value
+        self.context.ack_number = c_uint16(header.seq_number + 1).value
         self.context.send_ack()
         self.transition(CloseWaitState)

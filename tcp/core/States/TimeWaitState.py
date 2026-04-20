@@ -12,12 +12,10 @@ class TimeWaitState(TCPState):
         self._timer = None
         self._start_timer()
 
-    def on_ack(self, packet, addr, event):
-        logging.info("ACK recebido em TIME_WAIT. Ignorando...")
-
-    def on_fin(self, packet, addr, event):
+    def on_fin(self, packet, addr):
+        header = packet.header
         logging.warning("FIN recebido em TIME_WAIT. Reenviando ACK...")
-        self.context.ack_number = c_uint16(event.seq_number + 1).value
+        self.context.ack_number = c_uint16(header.seq_number + 1).value
         self.context.send_ack()
         self._start_timer()
 

@@ -1,12 +1,14 @@
 class Header:
-    def __init__(self):
-        self._seq_number = 0   # 16 bits
-        self._ack_number = 0   # 16 bits
-        self._recv_window = 0  # 16 bits
-        self._ack_flag = 0     # 1 bit
-        self._syn_flag = 0     # 1 bit
-        self._fin_flag = 0     # 1 bit
-        self._len_data = 0     # 13 bits
+    SIZE = 8
+    
+    def __init__(self, seq_number=0, ack_number=0, len_data = 0, recv_window = 0, ack_flag=0, syn_flag=0, fin_flag=0):
+        self._seq_number = seq_number   # 16 bits
+        self._ack_number = ack_number   # 16 bits
+        self._recv_window = recv_window  # 16 bits
+        self._len_data = len_data     # 13 bits
+        self._ack_flag = ack_flag     # 1 bit
+        self._syn_flag = syn_flag     # 1 bit
+        self._fin_flag = fin_flag     # 1 bit
 
     def _check(self, value, bits):
         if value < 0 or value > (2**bits - 1):
@@ -38,6 +40,14 @@ class Header:
         self._recv_window = self._check(value, 16)
 
     @property
+    def len_data(self):
+        return self._len_data
+
+    @len_data.setter
+    def len_data(self, value):
+        self._len_data = self._check(value, 13)
+
+    @property
     def ack_flag(self):
         return self._ack_flag
 
@@ -61,14 +71,6 @@ class Header:
     def fin_flag(self, value):
         self._fin_flag = self._check(value, 1)
 
-    @property
-    def len_data(self):
-        return self._len_data
-
-    @len_data.setter
-    def len_data(self, value):
-        self._len_data = self._check(value, 13)
-
     def to_bytes(self):
         value = (
             (self.seq_number << 48) | # 16 bits
@@ -79,17 +81,16 @@ class Header:
             (self.syn_flag << 1) | # 1 bit
             self.fin_flag # 1 bit
         )
-        return value.to_bytes(8, "big")
+        return value.to_bytes(self.SIZE, "big")
     
     @classmethod
     def from_bytes(cls, data):
-        if len(data) != 8:
-            raise ValueError("O header deve ter exatamente 8 bytes")
+        if len(data) != cls.SIZE:
+            raise ValueError(f"O header deve ter exatamente {cls.SIZE} bytes")
 
         value = int.from_bytes(data, "big")
 
         header = cls()
-
         header.seq_number = (value >> 48) & 0xFFFF   # 16 bits
         header.ack_number = (value >> 32) & 0xFFFF   # 16 bits
         header.recv_window = (value >> 16) & 0xFFFF  # 16 bits
