@@ -2,7 +2,7 @@ from tcp.core.Packet.Header import Header
 
 class Packet:
     def __init__(self, payload=b"", seq_number=0, ack_number=0, ack_flag=0, syn_flag=0, fin_flag=0):
-        self._header = Header(seq_number, ack_number, len(self._payload), 0, ack_flag, syn_flag, fin_flag)
+        self._header = Header(seq_number, ack_number, len(payload), 0, ack_flag, syn_flag, fin_flag)
         self._payload = bytes(payload)
 
     @property

@@ -2,8 +2,7 @@ import logging
 import threading
 import time
 
-
-class RetransmitController:
+class RetransmitWorker:
     def __init__(self, context, timeout_interval=0.5, tick_interval=0.1):
         self.context = context
         self.timeout_interval = timeout_interval

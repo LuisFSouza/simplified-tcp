@@ -8,6 +8,7 @@ class SendWorker:
     def __init__(self, context):
         self.context = context
         self.thread = threading.Thread(target=self._run, daemon=True)
+        self.mss = 1024
 
     def start(self):
         self.thread.start()
@@ -42,7 +43,7 @@ class SendWorker:
     def _record_metrics(self, bytes_in_flight):
         self.context.metrics.record_window(
             cwnd=self.context.congestion_control.get_cwnd(),
-            ssthresh=self.context.congestion_control.ssthresh,
+            ssthresh=self.context.congestion_control.get_ssthresh(),
             bytes_in_flight=bytes_in_flight,
             send_queue_size=self.context.send_queue.qsize(),
         )
@@ -51,7 +52,7 @@ class SendWorker:
         return bytes_in_flight + chunk_len <= self.context.congestion_control.get_cwnd()
 
     def _split_data(self, data):
-        return [data[i:i + self.context.mss] for i in range(0, len(data), self.context.mss)]
+        return [data[i:i + self.mss] for i in range(0, len(data), self.mss)]
 
     def _enqueue_remaining(self, chunks, start_index):
         remaining = b"".join(chunks[start_index:])

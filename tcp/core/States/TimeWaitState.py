@@ -2,7 +2,6 @@ import logging
 import threading
 from ctypes import c_uint16
 from .TCPState import TCPState
-from .ListenState import ListenState
 from .ClosedState import ClosedState
 
 class TimeWaitState(TCPState):
@@ -31,7 +30,5 @@ class TimeWaitState(TCPState):
             self.context.send_buffer.clear()
             self.context.send_base = self.context.seq_number
             self.context.remote_addr = None
-        if self.context.is_listening:
-            self.transition(ListenState)
-        else:
+            self.context.is_listening = False
             self.transition(ClosedState)

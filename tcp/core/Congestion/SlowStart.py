@@ -1,8 +1,8 @@
 from tcp.core.Congestion.CongestionControlState import CongestionControlState
-from tcp.core.Congestion.CongestionAvoidance import CongestionAvoidance
 
 class SlowStart(CongestionControlState):
     def ack_receive(self, machine):
+        from tcp.core.Congestion.CongestionAvoidance import CongestionAvoidance
         machine.cwnd += machine.mss
 
         if machine.cwnd >= machine.ssthresh:

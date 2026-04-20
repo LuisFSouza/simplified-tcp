@@ -15,3 +15,6 @@ class CongestionControl:
 
     def get_cwnd(self):
         return self.cwnd
+    
+    def get_ssthresh(self):
+        return self.ssthresh

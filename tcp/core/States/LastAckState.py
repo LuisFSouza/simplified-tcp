@@ -1,6 +1,5 @@
 import logging
 from .TCPState import TCPState
-from .ListenState import ListenState
 from .ClosedState import ClosedState
 
 class LastAckState(TCPState):
@@ -17,7 +16,5 @@ class LastAckState(TCPState):
             self.context.send_buffer.clear()
             self.context.send_base = self.context.seq_number
             self.context.remote_addr = None
-        if self.context.is_listening:
-            self.transition(ListenState)
-        else:
+            self.context.is_listening = False
             self.transition(ClosedState)

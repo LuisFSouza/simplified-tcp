@@ -2,16 +2,9 @@ import logging
 import time
 import matplotlib.pyplot as plt
 
-
 class MetricsCollector:
     def __init__(self):
-        self.window = {
-            "timestamps": [],
-            "cwnd": [],
-            "ssthresh": [],
-            "bytes_in_flight": [],
-            "send_queue_size": [],
-        }
+        self.window = {"timestamps": [], "cwnd": [], "ssthresh": [], "bytes_in_flight": [], "send_queue_size": []}
         self.ack = {"timestamps": [], "acked_bytes": []}
         self.received = {"timestamps": [], "received_bytes": []}
         self.retransmit = {"timestamps": [], "retransmissions": []}
@@ -21,8 +14,7 @@ class MetricsCollector:
         self._retransmit_total = 0
 
     def record_window(self, cwnd, ssthresh, bytes_in_flight, send_queue_size):
-        ts = time.time()
-        self.window["timestamps"].append(ts)
+        self.window["timestamps"].append(time.time())
         self.window["cwnd"].append(cwnd)
         self.window["ssthresh"].append(ssthresh)
         self.window["bytes_in_flight"].append(bytes_in_flight)
@@ -53,7 +45,7 @@ class MetricsCollector:
         self.rtt["timestamps"].append(time.time())
         self.rtt["rtt_ms"].append(rtt_seconds * 1000)
 
-    def plot(self, output_path="metrics.png", show=True):
+    def plot(self, output_path="metrics-{}.png".format(time.time()), show=True):
         starts = []
         for series in (self.window, self.ack, self.received, self.retransmit, self.rtt):
             if series["timestamps"]:
@@ -64,7 +56,7 @@ class MetricsCollector:
 
         start = min(starts)
 
-        fig, axes = plt.subplots(2, 3, figsize=(16, 8))
+        _ , axes = plt.subplots(2, 3, figsize=(16, 8))
 
         self._plot_window_metrics(axes[0, 0], start)
         self._plot_bytes_in_flight(axes[0, 1], start)
@@ -145,11 +137,11 @@ class MetricsCollector:
         plotted = False
         if self.ack["timestamps"]:
             ts = self._relative_time(self.ack["timestamps"], start)
-            axis.plot(ts, self.ack["acked_bytes"], label="acked bytes")
+            axis.plot(ts, self.ack["acked_bytes"], label="Acked bytes")
             plotted = True
         if self.received["timestamps"]:
             ts = self._relative_time(self.received["timestamps"], start)
-            axis.plot(ts, self.received["received_bytes"], label="received bytes")
+            axis.plot(ts, self.received["received_bytes"], label="Received bytes")
             plotted = True
         axis.set_title("Cumulative events")
         axis.set_xlabel("Time (s)")
