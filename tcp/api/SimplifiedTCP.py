@@ -88,14 +88,6 @@ class SimplifiedTCP:
                     return seq, pkt
         return None, None
 
-    def retransmit_first_buffered(self, predicate=None):
-        with self.lock:
-            for seq, (pkt, _) in self.send_buffer.items():
-                if predicate is None or predicate(pkt):
-                    self.send_buffer[seq] = (pkt, time.time())
-                    return pkt
-        return None
-
     def _advance_seq(self, payload_len, syn_flag, fin_flag):
         if syn_flag or fin_flag:
             self.seq_number = c_uint16(self.seq_number + 1).value
@@ -178,7 +170,7 @@ class SimplifiedTCP:
     def wait_for_send_complete(self, poll_interval=0.05):
         while True:
             with self.lock:
-                done = self.send_queue.empty() and not self.send_buffer
+                done = self.send_queue.empty() and len(self.send_buffer) == 0
             if done:
                 return
             time.sleep(poll_interval)

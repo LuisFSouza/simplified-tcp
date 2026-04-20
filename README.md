@@ -7,6 +7,10 @@ Este projeto implementa um TCP simplificado sobre UDP, com handshake, controle d
 - Servidor: `python apps/server/Server.py`
 - Cliente: `python apps/client/Client.py`
 
+Fluxo atual:
+- o servidor entra em listen e aguarda o cliente fechar a conexao via `listen_until_peer_closes()`;
+- o cliente envia os dados com `send_and_wait()` e depois encerra com `close()`.
+
 ## Estrutura principal
 - Cliente de exemplo: [apps/client/Client.py](apps/client/Client.py)
 - Servidor de exemplo: [apps/server/Server.py](apps/server/Server.py)
@@ -29,9 +33,10 @@ Este projeto implementa um TCP simplificado sobre UDP, com handshake, controle d
 - Acked bytes e received bytes (acumulado).
 
 ## Simulacao de perda de ACK
-No servidor, ative o sorteio de ACKs em [apps/server/Server.py](apps/server/Server.py) usando:
-- `ACK_LOSS_ENABLED = True`
-- `ACK_LOSS_RATE = 0.1`
+O servidor aceita a taxa de perda de ACK no construtor de [tcp/api/SimplifiedTCP.py](tcp/api/SimplifiedTCP.py). Exemplo:
+- `server = SimplifiedTCP("127.0.0.1", 3001, 0.2)`
+
+O terceiro parametro representa a taxa de perda simulada de ACKs.
 
 ## Fechamento de conexao
 - Fechamento ativo: ESTABLISHED -> FIN_WAIT_1 -> FIN_WAIT_2 -> TIME_WAIT -> CLOSED.
@@ -41,10 +46,9 @@ No servidor, ative o sorteio de ACKs em [apps/server/Server.py](apps/server/Serv
 ## Classes
 
 ### API
-- `SimplifiedTCP`: fachada do protocolo; coordena socket, estados, controle de congestao, buffers, workers e metricas. Arquivo: [tcp/api/SimplifiedTCP.py](tcp/api/SimplifiedTCP.py)
+- `SimplifiedTCP`: fachada do protocolo; coordena socket, estados, controle de congestao, buffers, workers e metricas. Expõe helpers de alto nivel como `send_and_wait()` e `listen_until_peer_closes()`. Arquivo: [tcp/api/SimplifiedTCP.py](tcp/api/SimplifiedTCP.py)
 
 ### Ciclo de vida e envio
-- `ConnectionLifecycle`: inicia e encerra as threads dos workers. Arquivo: [tcp/core/ConnectionLifecycle.py](tcp/core/ConnectionLifecycle.py)
 - `SendWorker`: consome a fila de envio, divide payloads, respeita o `cwnd` e registra metricas. Arquivo: [tcp/workers/SendWorker.py](tcp/workers/SendWorker.py)
 - `ReceiveWorker`: recebe pacotes UDP e delega o tratamento ao estado atual. Arquivo: [tcp/workers/ReceiveWorker.py](tcp/workers/ReceiveWorker.py)
 - `RetransmitController`: monitora timeouts no send buffer e retransmite, atualizando controle de congestao e metricas. Arquivo: [tcp/workers/RetransmitWorker.py](tcp/workers/RetransmitWorker.py)
@@ -53,7 +57,6 @@ No servidor, ative o sorteio de ACKs em [apps/server/Server.py](apps/server/Serv
 ### Pacotes
 - `Header`: representa o header fixo e valida campos (seq, ack, recv_window, flags, len). Arquivo: [tcp/core/Packet/Header.py](tcp/core/Packet/Header.py)
 - `Packet`: encapsula header e payload e faz (de)serializacao. Arquivo: [tcp/core/Packet/Packet.py](tcp/core/Packet/Packet.py)
-- `PacketBuilder`: monta e envia pacotes, atualiza sequencias e bufferiza envios. Arquivo: [tcp/core/PacketBuilder.py](tcp/core/PacketBuilder.py)
 
 ### Controle de congestao
 - `CongestionControl`: mantem `cwnd`/`ssthresh` e delega para o estado atual. Arquivo: [tcp/core/Congestion/CongestionControl.py](tcp/core/Congestion/CongestionControl.py)
@@ -62,7 +65,6 @@ No servidor, ative o sorteio de ACKs em [apps/server/Server.py](apps/server/Serv
 - `CongestionAvoidance`: crescimento aditivo por ACK; em timeout reinicia. Arquivo: [tcp/core/Congestion/CongestionAvoidance.py](tcp/core/Congestion/CongestionAvoidance.py)
 
 ### Estados do TCP
-- `PacketEvent`: normaliza flags e tamanhos do header para o roteamento. Arquivo: [tcp/core/States/TCPState.py](tcp/core/States/TCPState.py)
 - `TCPState`: base da FSM; roteia SYN/ACK/FIN/DATA para handlers. Arquivo: [tcp/core/States/TCPState.py](tcp/core/States/TCPState.py)
 - `ClosedState`: estado inicial; inicia conexao (cliente) ou entra em listen. Arquivo: [tcp/core/States/ClosedState.py](tcp/core/States/ClosedState.py)
 - `ListenState`: aguarda SYN e responde com SYN-ACK. Arquivo: [tcp/core/States/ListenState.py](tcp/core/States/ListenState.py)
