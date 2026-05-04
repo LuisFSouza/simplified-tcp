@@ -1,5 +1,9 @@
 # TCP simplificado sobre UDP
 
+## Integrantes
+- Luis Felipi Cruz de Souza [@LuisFSouza](https://github.com/LuisFSouza)
+- Felipe Bonadia de Oliveira Bravo [@FelipeBonadia](https://github.com/FelipeBonadia)
+
 ## Visao geral
 Este projeto implementa um TCP simplificado sobre UDP, com handshake, controle de congestionamento, retransmissao e coleta de metricas. Ha um cliente e um servidor de exemplo para exercitar o protocolo.
 
