@@ -17,7 +17,7 @@ from tcp.core.States.LastAckState import LastAckState
 from tcp.core.Packet.Packet import Packet
 
 class SimplifiedTCP:
-    def __init__(self, ip, port, ack_drop_rate=0.0):
+    def __init__(self, ip, port, ack_drop_rate=0.0, drop_ack_for_packet_index =None):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((ip, port))
         self.remote_addr = None
@@ -25,14 +25,25 @@ class SimplifiedTCP:
         self.ack_number = 0
         self.send_base = 0
         self.send_buffer = {}
+        self.receive_buffer = {}
+        self.application_buffer = queue.Queue()
         self.send_queue = queue.Queue()
         self.lock = threading.RLock()
         self.stop_threads = False
         self.is_listening = False
+        self.last_ack_number = 0;
+        self.duplicate_ack_count = 0;
+        
+        # Simulações de timeout e 3 acks duplicados
         self.ack_drop_enabled = False
         if (ack_drop_rate > 0):
             self.ack_drop_enabled = True
         self.ack_drop_rate = ack_drop_rate
+        
+        self.drop_data_for_packet_index = drop_ack_for_packet_index
+        self.received_packet_count = 0
+    
+        
         self.congestion_control = CongestionControl()
         self.metrics = MetricsCollector()
         self.state = ClosedState(self)

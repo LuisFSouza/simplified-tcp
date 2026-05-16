@@ -4,10 +4,11 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from tcp.api.SimplifiedTCP import SimplifiedTCP
 
-server = SimplifiedTCP("127.0.0.1", 3001, 0.2)  # 20% de perda de ACK
-
+server = SimplifiedTCP("127.0.0.1", 3001, drop_ack_for_packet_index=5)  # 3 Acks duplicados para o pacote de índice 5
 logging.warning("Servidor iniciado. Aguardando conexão...")
 server.listen_until_peer_closes()
+
+logging.warning("Quantidade de pacotes recebidos: %d", server.application_buffer.qsize())
 
 logging.warning("Conexão fechada. Plotando métricas...")
 server.plot_metrics()
