@@ -12,6 +12,12 @@ class CongestionControl:
 
     def timeout(self):
         self.state.timeout(self)
+        
+    def three_dup_ack(self):
+        self.state.three_dup_ack(self)
+
+    def additional_dup_ack(self):
+        self.state.additional_dup_ack(self)
 
     def get_cwnd(self):
         return self.cwnd

@@ -9,3 +9,9 @@ class CongestionAvoidance(CongestionControlState):
         machine.ssthresh = max(machine.cwnd / 2, machine.mss)
         machine.cwnd = machine.mss
         machine.state = SlowStart()
+        
+    def three_dup_ack(self, machine):
+        from tcp.core.Congestion.FastRecovery import FastRecovery
+        machine.ssthresh = max(machine.cwnd / 2, machine.mss)
+        machine.cwnd = machine.ssthresh + 3 * machine.mss
+        machine.state = FastRecovery()
