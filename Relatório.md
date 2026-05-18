@@ -1,42 +1,21 @@
-# Relatório de CWND vs Tempo
+# Relatório
 
-O gráfico de métricas é gerado automaticamente pelo `tcp.workers.MetricsCollector` na chamada `SimplifiedTCP.plot_metrics()`.
-Ele inclui a plotagem de `cwnd` e `ssthresh` ao longo do tempo.
+## Gráficos da execução do TCP.
 
-## Comportamento observado
+![Gráfico](exemplo.png)
 
-- CWND inicial é `MSS = 1024 bytes`.
-- Em `SlowStart`, a cada ACK recebido a janela cresce em `MSS` bytes.
-- Quando `cwnd >= ssthresh` (inicial de `15360 bytes`), o controle muda para `CongestionAvoidance`.
-- Em `CongestionAvoidance`, o crescimento por ACK é aproximado por `(MSS^2) / cwnd`, ou seja, um aumento mais lento e linear no longo prazo.
-- Ao receber 3 acks duplicados, o pacote é retransmitido e o tcp entra em fast recovey, ate que este seja reconhecido. Nesse periodo, novos acks duplicados pelo mesmo pacote inflam a janela. Ao receber o reconhecimento deste pacote, a janela é desinflada e o congestion avoidance é iniciado.
-- A ocorrência de 3 ACKs duplicados é o sinal típico de um segmento perdido em TCP e, em implementações reais, acionaria um fast retransmit 
-- No timeout, o protocolo reduz `ssthresh = max(cwnd/2, MSS)`, reinicia `cwnd = MSS` e retorna a `SlowStart`.
+## Cenário
 
-## Desempenho sob diferentes condições de perda
+A execução é sobre um envio de 1000 pacotes do cliente para o servidor, com uma simulação de 3 acks duplicados sobre o pacote 500.
 
-- Com perda baixa ou zero, o CWND sobe rapidamente e alcança a fase de `CongestionAvoidance`, produzindo throughput mais alto e menos retransmissões.
-- Com perda moderada (por exemplo, `ack_drop_rate = 0.2`), a perda de ACKs causa timeouts frequentes.
-  - O CWND sofre quedas abruptas para `MSS` e precisa recomeçar a partir de `SlowStart`.
-  - Isso produz uma forma de onda típica de `sawtooth` no gráfico de CWND.
-  - O throughput efetivo cai porque o protocolo passa mais tempo em recuperação.
-- Com perda alta, o protocolo tende a permanecer mais tempo em `SlowStart`, reduzindo a janela de envio média e aumentando o número total de retransmissões.
+### Comportamento observado
 
-## Reproduzir e comparar
+- CWND inicial é `MSS = 1024 bytes`, e `ssthresh = 15360`, o TCP inicia no Slow Start.
+- Em Slow Start, a cada ACK recebido, a janela cresce em `MSS` bytes (de 0 até aproximadamente 0.1s no primeiro gráfico).
+- Quando `cwnd >= ssthresh` (inicial de `15360 bytes`), o controle muda para Congestion Avoidance. É possível observar isso próximo de 0.1s no gráfico.
+- Em Congestion Avoidance, o crescimento por ACK é aproximado por `(MSS^2) / cwnd`, ou seja, um aumento mais lento e linear no longo prazo (de aproximadamente 0.1s até aproximadamente 0.7s no primeiro gráfico). 
+- Ao receber 3 ACKs duplicados do pacote perdido simulado, o pacote é retransmitido e o TCP entra em Fast Recovery. Nesse momento (em aproximadamente 0,7s no primeiro gráfico), é evidente que `ssthresh` vai para o valor que corresponde a metade do `cwnd`, e o `cwnd` tem uma queda. Também é visível a retransmissão no último gráfico.
+- Neste estado (Fast Recovery), conforme ACKs duplicados adicionais vão chegando, a janela (`cwnd`) é inflada em `1 MSS`, até que o pacote não reconhecido seja reconhecido. Isso é observável no primeiro gráfico de aproximadamente 0.7s até aproximadamente 1.1s.
+- Em aproximadamente 1.1s, o pacote não reconhecido é reconhecido, a janela é desinflada, isto é, `cwnd` vai para o valor correspondente a `ssthresh`. A partir disso (de aproximadamente 1.1s adiante), o protocolo segue em Congestion Avoidance.
 
-Para comparar condições de perda, altere o parâmetro `ack_drop_rate` em `apps/server/Server.py`:
-
-```python
-server = SimplifiedTCP("127.0.0.1", 3001, 0.2)  # 20% de perda de ACK
-```
-
-Use valores como `0.0`, `0.1`, `0.2` ou `0.5` e execute novamente o servidor e o cliente.
-
-## Arquivos gerados
-
-- Exemplo de plot criado nesta execução: `metrics-1779060707.9865332.png`
-
-## Conclusão
-
-A implementação mostra um controle de congestionamento típico de TCP simplificado: crescimento exponencial em `SlowStart`, transição para crescimento mais linear em `CongestionAvoidance` e retração rápida em caso de perda.
-A perda de ACKs é traduzida em timeouts e perda de janela, o que reduz sensivelmente o desempenho em condições com perda maior.
+Podemos perceber que os 3 ACKs duplicados funcionaram corretamente, e o cliente conseguiu entregar todos os pacotes esperados ao servidor, com todos os estados funcionando adequadamente.
