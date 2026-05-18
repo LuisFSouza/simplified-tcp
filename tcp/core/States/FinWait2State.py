@@ -10,6 +10,3 @@ class FinWait2State(TCPState):
         self.context.ack_number = c_uint16(header.seq_number + 1).value
         self.context.send_ack()
         self.transition(TimeWaitState)
-
-    def on_data(self, packet, addr):
-        logging.warning("Dados recebidos em FIN_WAIT_2. Ignorando...")

@@ -7,12 +7,8 @@ from .ClosingState import ClosingState
 class FinWait1State(EstablishedState):
     def on_ack(self, packet, addr):
         header = packet.header
-        received_ack = header.ack_number
         
-        logging.warning(f"ACK recebido no FinWait1: {received_ack}")
-        keys_to_remove = [seq for seq in self.context.send_buffer.keys() if seq < received_ack]
-        for seq in keys_to_remove:
-            del self.context.send_buffer[seq]
+        super().on_ack(packet, addr)
             
         if header.ack_number == self.context.seq_number:
             logging.warning("FIN confirmado. Aguardando FIN do peer...")
