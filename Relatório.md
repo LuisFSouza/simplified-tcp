@@ -9,8 +9,8 @@ Ele inclui a plotagem de `cwnd` e `ssthresh` ao longo do tempo.
 - Em `SlowStart`, a cada ACK recebido a janela cresce em `MSS` bytes.
 - Quando `cwnd >= ssthresh` (inicial de `15360 bytes`), o controle muda para `CongestionAvoidance`.
 - Em `CongestionAvoidance`, o crescimento por ACK é aproximado por `(MSS^2) / cwnd`, ou seja, um aumento mais lento e linear no longo prazo.
-- A ocorrência de 3 ACKs duplicados é o sinal típico de um segmento perdido em TCP e, em implementações reais, acionaria um fast retransmit.
-- Neste protótipo simplificado, a perda é tratada via timeout: se um pacote fica sem ACK por `0.5 s`, ele é retransmitido.
+- Ao receber 3 acks duplicados, o pacote é retransmitido e o tcp entra em fast recovey, ate que este seja reconhecido. Nesse periodo, novos acks duplicados pelo mesmo pacote inflam a janela. Ao receber o reconhecimento deste pacote, a janela é desinflada e o congestion avoidance é iniciado.
+- A ocorrência de 3 ACKs duplicados é o sinal típico de um segmento perdido em TCP e, em implementações reais, acionaria um fast retransmit 
 - No timeout, o protocolo reduz `ssthresh = max(cwnd/2, MSS)`, reinicia `cwnd = MSS` e retorna a `SlowStart`.
 
 ## Desempenho sob diferentes condições de perda
