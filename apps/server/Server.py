@@ -4,7 +4,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 from tcp.api.SimplifiedTCP import SimplifiedTCP
 
-server = SimplifiedTCP("127.0.0.1", 3001, drop_ack_for_packet_index=5)  # 3 Acks duplicados para o pacote de índice 5
+server = SimplifiedTCP("127.0.0.1", 3001, drop_packet_for_index=500)  # 3 Acks duplicados para o pacote de índice 500
 logging.warning("Servidor iniciado. Aguardando conexão...")
 server.listen_until_peer_closes()
 

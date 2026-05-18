@@ -11,8 +11,9 @@ class EstablishedState(TCPState):
         received_ack = header.ack_number
         logging.info(f"ACK recebido: {received_ack}")
         
-        if (c_uint16(received_ack - self.context.last_ack_number).value > 0 and 
-            received_ack != self.context.last_ack_number):
+        if (self.context.last_ack_number is None or (
+                c_uint16(received_ack - self.context.last_ack_number).value > 0 and
+                received_ack != self.context.last_ack_number)):
             self.context.last_ack_number = received_ack
             self.context.dup_ack_count = 0
             
@@ -22,21 +23,25 @@ class EstablishedState(TCPState):
                     keys_to_remove.append(seq)
 
             acked_bytes = 0
-            for seq in sorted(keys_to_remove):
+            for seq in sorted(keys_to_remove, key=lambda seq: c_uint16(seq - self.context.send_base).value):
                 pkt, sent_at = self.context.send_buffer[seq]
                 payload_len = len(pkt.payload)
                 fin_consumes = 1 if pkt.header.fin_flag == 1 else 0
                 packet_len = payload_len + fin_consumes
                 acked_bytes += packet_len
+                
                 self.context.send_base = c_uint16(seq + packet_len).value
+            
                 if sent_at is not None:
                     self.context.metrics.record_rtt(now - sent_at)
                 del self.context.send_buffer[seq]
+                
             self.context.congestion_control.ack_receive()
             self.context.metrics.record_acked(acked_bytes)
+            
         elif received_ack == self.context.last_ack_number:
             if self.context.send_buffer:
-                lost_seq = min(self.context.send_buffer.keys())
+                lost_seq = min(self.context.send_buffer.keys(), key=lambda seq: c_uint16(seq - self.context.send_base).value)
                 pkt, _ = self.context.send_buffer[lost_seq]
                 
                 if c_uint16(received_ack - lost_seq).value == 0:
