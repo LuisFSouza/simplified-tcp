@@ -74,6 +74,11 @@ class EstablishedState(TCPState):
         
         if header.len_data > 0:
             expected_seq = self.context.ack_number
+            if c_uint16(header.seq_number - expected_seq).value >= 32768:
+                logging.warning(f"Pacote antigo/duplicado detectado e descartado (seq {header.seq_number})")
+                self.context.send_ack()
+                return
+            
             self.context.receive_buffer[header.seq_number] = packet.payload
             if(header.seq_number == expected_seq):
                 logging.info(f"Dados recebidos na ordem (seq {header.seq_number}). Enviando ACK normal...")

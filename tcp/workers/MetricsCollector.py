@@ -56,14 +56,15 @@ class MetricsCollector:
 
         start = min(starts)
 
-        _ , axes = plt.subplots(2, 3, figsize=(16, 8))
+        # antes: _, axes = plt.subplots(2, 3, figsize=(16, 8))
+        _, ax = plt.subplots(1, 1, figsize=(8, 6))
 
-        self._plot_window_metrics(axes[0, 0], start)
-        self._plot_bytes_in_flight(axes[0, 1], start)
-        self._plot_rtt(axes[0, 2], start)
-        self._plot_throughput(axes[1, 0], start)
-        self._plot_cumulative_events(axes[1, 1], start)
-        self._plot_retransmissions(axes[1, 2], start)
+        self._plot_window_metrics(ax, start)
+        # self._plot_bytes_in_flight(axes[0, 1], start)
+        # self._plot_rtt(axes[0, 2], start)
+        # self._plot_throughput(axes[1, 0], start)
+        # self._plot_cumulative_events(axes[1, 1], start)
+        # self._plot_retransmissions(axes[1, 2], start)
 
         plt.tight_layout()
         plt.savefig(output_path)

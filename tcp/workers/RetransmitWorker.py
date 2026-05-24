@@ -27,10 +27,30 @@ class RetransmitWorker:
                             logging.warning(f"TIMEOUT: Retransmitindo pacote com seq {oldest_seq}")
                             self.context.send_buffer[oldest_seq] = (packet, time.time())
                             self.context.socket.sendto(packet.to_bytes(), self.context.remote_addr)
-                            
+
                             self.context.dup_ack_count = 0
                             self.context.last_ack_number = None
-                            
+
+                            bytes_in_flight = c_uint16(
+                                self.context.seq_number - self.context.send_base
+                            ).value
+
+                            # Ponto ANTES da queda (cwnd alto)
+                            self.context.metrics.record_window(
+                                cwnd=self.context.congestion_control.get_cwnd(),
+                                ssthresh=self.context.congestion_control.get_ssthresh(),
+                                bytes_in_flight=bytes_in_flight,
+                                send_queue_size=self.context.send_queue.qsize(),
+                            )
+
                             self.context.congestion_control.timeout()
                             self.context.metrics.record_retransmit()
+
+                            # Ponto DEPOIS da queda (cwnd = mss)
+                            self.context.metrics.record_window(
+                                cwnd=self.context.congestion_control.get_cwnd(),
+                                ssthresh=self.context.congestion_control.get_ssthresh(),
+                                bytes_in_flight=bytes_in_flight,
+                                send_queue_size=self.context.send_queue.qsize(),
+                            )
             time.sleep(self.tick_interval)

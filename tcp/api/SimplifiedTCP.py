@@ -166,8 +166,11 @@ class SimplifiedTCP:
         for thread in (self.receive_worker.thread, self.send_worker.thread, self.retransmit_worker.thread):
             thread.join(timeout=join_timeout)
 
-    def plot_metrics(self):
-        self.metrics.plot()
+    def plot_metrics(self, output_path=None, show=True):
+        if output_path is None:
+            self.metrics.plot(show=show)
+            return
+        self.metrics.plot(output_path=output_path, show=show)
 
     def listen_until_peer_closes(self, poll_interval=0.05):
         self.get_state().listen()
@@ -182,7 +185,9 @@ class SimplifiedTCP:
     def wait_for_send_complete(self, poll_interval=0.05):
         while True:
             with self.lock:
-                done = self.send_queue.empty() and len(self.send_buffer) == 0
-            if done:
+                buffer_empty = len(self.send_buffer) == 0
+            queue_empty = self.send_queue.empty()
+            worker_empty = not self.send_worker.has_pending()
+            if buffer_empty and queue_empty and worker_empty:
                 return
             time.sleep(poll_interval)

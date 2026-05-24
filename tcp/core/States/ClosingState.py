@@ -8,6 +8,10 @@ class ClosingState(TCPState):
         header = packet.header
         if header.ack_number == self.context.seq_number:
             logging.warning("ACK do FIN recebido em CLOSING. Indo para TIME_WAIT...")
+            # Limpa o FIN do send_buffer para evitar timeout espúrio
+            with self.context.lock:
+                self.context.send_buffer.clear()
+                self.context.send_base = self.context.seq_number
             self.transition(TimeWaitState)
         else:
             logging.info("ACK recebido em CLOSING. Ignorando...")

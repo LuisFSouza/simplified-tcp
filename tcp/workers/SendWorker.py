@@ -9,30 +9,51 @@ class SendWorker:
         self.context = context
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.mss = 1024
+        self._pending = b""
+        self._pending_lock = threading.Lock()
 
     def start(self):
         self.thread.start()
 
+    def has_pending(self):
+        with self._pending_lock:
+            return bool(self._pending)
+
+    # SendWorker.py
     def _run(self):
         while not self.context.stop_threads:
             if not self._is_established():
                 time.sleep(0.05)
                 continue
-            data = self._get_next_payload()
-            if data is None:
-                continue
 
-            chunks = self._split_data(data)
-            for i, chunk in enumerate(chunks):
-                with self.context.lock:
-                    bytes_in_flight = self._bytes_in_flight()
-                    self._record_metrics(bytes_in_flight)
+            with self._pending_lock:
+                if not self._pending:
+                    data = self._get_next_payload()
+                    if data is None:
+                        continue
+                    self._pending = data
 
-                    if not self._can_send(bytes_in_flight, len(chunk)):
-                        self._enqueue_remaining(chunks, i)
-                        break
+            with self.context.lock:
+                bytes_in_flight = self._bytes_in_flight()
+                cwnd = int(self.context.congestion_control.get_cwnd())
 
-                    self.context.send_packet(payload=chunk)
+                # Registra métricas SEMPRE, independente de conseguir enviar
+                self._record_metrics(bytes_in_flight)
+
+                with self._pending_lock:
+                    if not self._pending:
+                        continue
+                    chunk_size = min(self.mss, len(self._pending))
+
+                if bytes_in_flight + chunk_size > cwnd:
+                    time.sleep(0.001)
+                    continue
+
+                with self._pending_lock:
+                    chunk = self._pending[:chunk_size]
+                    self._pending = self._pending[chunk_size:]
+
+                self.context.send_packet(payload=chunk)
 
     def _is_established(self):
         return isinstance(self.context.state, EstablishedState)
@@ -47,17 +68,6 @@ class SendWorker:
             bytes_in_flight=bytes_in_flight,
             send_queue_size=self.context.send_queue.qsize(),
         )
-
-    def _can_send(self, bytes_in_flight, chunk_len):
-        return bytes_in_flight + chunk_len <= self.context.congestion_control.get_cwnd()
-
-    def _split_data(self, data):
-        return [data[i:i + self.mss] for i in range(0, len(data), self.mss)]
-
-    def _enqueue_remaining(self, chunks, start_index):
-        remaining = b"".join(chunks[start_index:])
-        if remaining:
-            self.context.send_queue.put(remaining)
 
     def _get_next_payload(self):
         try:

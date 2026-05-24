@@ -2,9 +2,9 @@ from tcp.core.Congestion.SlowStart import SlowStart
 
 class CongestionControl:
     def __init__(self, mss=1024, ssthresh=15360):
-        self.mss = mss
-        self.cwnd = mss
-        self.ssthresh = ssthresh
+        self.mss = int(mss)
+        self.cwnd = int(mss)
+        self.ssthresh = int(ssthresh)
         self.state = SlowStart()
 
     def ack_receive(self):

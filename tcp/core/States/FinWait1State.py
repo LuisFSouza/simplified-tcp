@@ -7,12 +7,24 @@ from .ClosingState import ClosingState
 class FinWait1State(EstablishedState):
     def on_ack(self, packet, addr):
         header = packet.header
+        received_ack = header.ack_number
+
+        logging.warning(f"ACK recebido no FinWait1: {received_ack}")
         
-        super().on_ack(packet, addr)
+        with self.context.lock:
+            keys_to_remove = [
+                seq for seq in self.context.send_buffer.keys()
+                if c_uint16(seq - self.context.send_base).value < 
+                c_uint16(received_ack - self.context.send_base).value
+            ]
+            for seq in keys_to_remove:
+                del self.context.send_buffer[seq]
             
-        if header.ack_number == self.context.seq_number:
-            logging.warning("FIN confirmado. Aguardando FIN do peer...")
-            self.transition(FinWait2State)
+            if header.ack_number == self.context.seq_number:
+                logging.warning("FIN confirmado. Aguardando FIN do peer...")
+                self.context.send_buffer.clear()  # garante limpeza total
+                self.context.send_base = self.context.seq_number
+                self.transition(FinWait2State)
 
     def on_fin(self, packet, addr):
         header = packet.header
