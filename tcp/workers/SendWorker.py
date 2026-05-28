@@ -1,6 +1,7 @@
 import time
 import threading
 import queue
+import logging
 from ctypes import c_uint16
 from tcp.core.States.EstablishedState import EstablishedState
 
@@ -11,6 +12,8 @@ class SendWorker:
         self.mss = 1024
         self._pending = b""
         self._pending_lock = threading.Lock()
+        self.last_window_probe = 0
+        self.window_probe_interval = 0.5
 
     def start(self):
         self.thread.start()
@@ -18,8 +21,7 @@ class SendWorker:
     def has_pending(self):
         with self._pending_lock:
             return bool(self._pending)
-
-    # SendWorker.py
+        
     def _run(self):
         while not self.context.stop_threads:
             if not self._is_established():
@@ -36,6 +38,7 @@ class SendWorker:
             with self.context.lock:
                 bytes_in_flight = self._bytes_in_flight()
                 cwnd = int(self.context.congestion_control.get_cwnd())
+                rwnd = self.context.remote_receiver_window
 
                 # Registra métricas SEMPRE, independente de conseguir enviar
                 self._record_metrics(bytes_in_flight)
@@ -48,11 +51,34 @@ class SendWorker:
                 if bytes_in_flight + chunk_size > cwnd:
                     time.sleep(0.001)
                     continue
+                
+                if bytes_in_flight + chunk_size > rwnd:
+                    current_time = time.time()
+                    if rwnd == 0 and (current_time - self.last_window_probe) >= self.window_probe_interval:
+                        logging.warning(
+                            f"[WINDOW PROBE] Receiver window zerada. Enviando probe vazio. "
+                            f"bytes_in_flight={bytes_in_flight}, cwnd={cwnd}"
+                        )
+                        self.context.send_packet(payload=b"")
+                        self.last_window_probe = current_time
+                        continue
+                    else:
+                        logging.warning(
+                            f"[FLOW CONTROL] Envio bloqueado por receiver window. "
+                            f"bytes_in_flight={bytes_in_flight}, chunk_size={chunk_size}, "
+                            f"rwnd={rwnd}, cwnd={cwnd}"
+                        )
+                        time.sleep(0.001)
+                        continue
 
                 with self._pending_lock:
                     chunk = self._pending[:chunk_size]
                     self._pending = self._pending[chunk_size:]
 
+                logging.info(
+                    f"[SEND] bytes_in_flight={bytes_in_flight}, chunk_size={chunk_size}, "
+                    f"cwnd={cwnd}, rwnd={rwnd}"
+                )
                 self.context.send_packet(payload=chunk)
 
     def _is_established(self):

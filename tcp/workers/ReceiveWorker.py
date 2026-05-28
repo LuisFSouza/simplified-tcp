@@ -33,6 +33,8 @@ class ReceiveWorker:
         if self.context.remote_addr is None:
             self.context.remote_addr = addr
 
+        self.context.remote_receiver_window = packet.header.recv_window
+
         header = packet.header
         logging.warning(
             f"Recebeu pacote de {addr} | "
@@ -41,6 +43,7 @@ class ReceiveWorker:
             f"ack_flag={header.ack_flag} "
             f"syn_flag={header.syn_flag} "
             f"fin_flag={header.fin_flag} "
-            f"len_data={header.len_data}"
+            f"len_data={header.len_data} "
+            f"recv_window={header.recv_window}"
         )
         return packet, addr

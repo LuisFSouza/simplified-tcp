@@ -4,7 +4,7 @@ import time
 from ctypes import c_uint16
 
 class RetransmitWorker:
-    def __init__(self, context, timeout_interval=0.5, tick_interval=0.1):
+    def __init__(self, context, timeout_interval=0.8, tick_interval=0.1):
         self.context = context
         self.timeout_interval = timeout_interval
         self.tick_interval = tick_interval

@@ -43,7 +43,9 @@ class SimplifiedTCP:
         
         self.drop_data_for_packet_index = drop_packet_for_index
         self.received_packet_count = 0
-    
+        
+        # Flow control: remote receiver window (16 bits max = 65535 bytes)
+        self.remote_receiver_window = 65535
         
         self.congestion_control = CongestionControl()
         self.metrics = MetricsCollector()
@@ -65,10 +67,13 @@ class SimplifiedTCP:
     def set_remote(self, ip, port):
         self.remote_addr = (ip, port)
 
-    def send_packet(self, payload=b"", ack_flag=0, syn_flag=0, fin_flag=0):
+    def send_packet(self, payload=b"", ack_flag=0, syn_flag=0, fin_flag=0, recv_window=None):
         if self.remote_addr is None:
             logging.error("Endereco remoto nao definido")
             raise ValueError("Endereco remoto nao definido")
+
+        if recv_window is None:
+            recv_window = self._calculate_receiver_window()
 
         packet = Packet(
             payload=payload,
@@ -78,6 +83,8 @@ class SimplifiedTCP:
             syn_flag=syn_flag,
             fin_flag=fin_flag,
         )
+        
+        packet.header.recv_window = recv_window
 
         self._advance_seq(len(payload), syn_flag, fin_flag)
 
@@ -106,6 +113,11 @@ class SimplifiedTCP:
         elif payload_len > 0:
             self.seq_number = c_uint16(self.seq_number + payload_len).value
 
+    def _calculate_receiver_window(self):
+        bytes_in_receive_buffer = sum(len(payload) for payload in self.receive_buffer.values())
+        available_window = max(0, 65535 - bytes_in_receive_buffer)
+        return available_window
+
     def _log_send(self, packet):
         header = packet.header
         logging.warning(
@@ -115,7 +127,8 @@ class SimplifiedTCP:
             f"ack_flag={header.ack_flag} "
             f"syn_flag={header.syn_flag} "
             f"fin_flag={header.fin_flag} "
-            f"len_data={header.len_data}"
+            f"len_data={header.len_data} "
+            f"recv_window={header.recv_window}"
         )
 
     def send_ack(self):

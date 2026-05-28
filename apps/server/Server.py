@@ -17,7 +17,7 @@ logging.basicConfig(
 
 from tcp.api.SimplifiedTCP import SimplifiedTCP
 
-server = SimplifiedTCP("127.0.0.1", 3001, ack_drop_rate=0.001)  # 3 Acks duplicados para o pacote de índice 500
+server = SimplifiedTCP("127.0.0.1", 3001, drop_packet_for_index = 200)  # 3 Acks duplicados para o pacote de índice 500
 logging.warning("Servidor iniciado. Aguardando conexão...")
 server.listen_until_peer_closes()
 
