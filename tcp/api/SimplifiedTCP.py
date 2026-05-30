@@ -17,7 +17,7 @@ from tcp.core.States.LastAckState import LastAckState
 from tcp.core.Packet.Packet import Packet
 
 class SimplifiedTCP:
-    def __init__(self, ip, port, ack_drop_rate=0.0, drop_packet_for_index = None):
+    def __init__(self, ip, port, ack_drop_rate=0.0, drop_packet_for_index=None, max_window_size=65535):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((ip, port))
         self.remote_addr = None
@@ -27,26 +27,28 @@ class SimplifiedTCP:
         self.send_buffer = {}
         self.receive_buffer = {}
         self.application_buffer = queue.Queue()
+
+        # Contador de bytes acumulados no application_buffer
+        self._application_buffer_bytes = 0
+
         self.send_queue = queue.Queue()
         self.lock = threading.RLock()
         self.stop_threads = False
         self.is_listening = False
-        
-        self.last_ack_number = None;
+
+        self.last_ack_number = None
         self.dup_ack_count = 0
-        
-        # Simulações de timeout e 3 acks duplicados
+
         self.ack_drop_enabled = False
-        if (ack_drop_rate > 0):
+        if ack_drop_rate > 0:
             self.ack_drop_enabled = True
         self.ack_drop_rate = ack_drop_rate
-        
+
         self.drop_data_for_packet_index = drop_packet_for_index
         self.received_packet_count = 0
-        
-        # Flow control: remote receiver window (16 bits max = 65535 bytes)
+
         self.remote_receiver_window = 65535
-        
+        self.max_window_size = max_window_size
         self.congestion_control = CongestionControl()
         self.metrics = MetricsCollector()
         self.state = ClosedState(self)
@@ -54,6 +56,15 @@ class SimplifiedTCP:
         self.receive_worker = ReceiveWorker(self)
         self.retransmit_worker = RetransmitWorker(self)
         self.start_workers()
+
+    def app_buffer_put(self, payload: bytes):
+        self.application_buffer.put(payload)
+        self._application_buffer_bytes += len(payload)
+
+    def app_buffer_get(self, block=True, timeout=None):
+        chunk = self.application_buffer.get(block=block, timeout=timeout)
+        self._application_buffer_bytes = max(0, self._application_buffer_bytes - len(chunk))
+        return chunk
 
     def set_state(self, new_state):
         self.state = new_state
@@ -83,7 +94,6 @@ class SimplifiedTCP:
             syn_flag=syn_flag,
             fin_flag=fin_flag,
         )
-        
         packet.header.recv_window = recv_window
 
         self._advance_seq(len(payload), syn_flag, fin_flag)
@@ -114,8 +124,10 @@ class SimplifiedTCP:
             self.seq_number = c_uint16(self.seq_number + payload_len).value
 
     def _calculate_receiver_window(self):
-        bytes_in_receive_buffer = sum(len(payload) for payload in self.receive_buffer.values())
-        available_window = max(0, 65535 - bytes_in_receive_buffer)
+        bytes_out_of_order = sum(len(p) for p in self.receive_buffer.values())
+        bytes_app_pending  = self._application_buffer_bytes
+        used = bytes_out_of_order + bytes_app_pending
+        available_window = max(0, self.max_window_size - used)
         return available_window
 
     def _log_send(self, packet):
@@ -185,12 +197,28 @@ class SimplifiedTCP:
             return
         self.metrics.plot(output_path=output_path, show=show)
 
-    def listen_until_peer_closes(self, poll_interval=0.05):
+    def listen_until_peer_closes(self, poll_interval=0.05, app_processing_delay=0.0):
         self.get_state().listen()
+        def _drain():
+            while not isinstance(self.state, (CloseWaitState, ClosedState)):
+                try:
+                    self.app_buffer_get(block=True, timeout=0.1)
+                    
+                    if app_processing_delay > 0:
+                        time.sleep(app_processing_delay)
+                        
+                except queue.Empty:
+                    pass
+
+        drain_thread = threading.Thread(target=_drain, daemon=True)
+        drain_thread.start()
+
         while not isinstance(self.state, CloseWaitState):
             time.sleep(poll_interval)
+
+        drain_thread.join(timeout=2.0)
         self.close()
-    
+
     def send_and_wait(self, data: bytes, poll_interval=0.05):
         self.send_data(data)
         self.wait_for_send_complete(poll_interval=poll_interval)

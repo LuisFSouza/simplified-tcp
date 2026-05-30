@@ -17,11 +17,11 @@ logging.basicConfig(
 
 from tcp.api.SimplifiedTCP import SimplifiedTCP
 
-server = SimplifiedTCP("127.0.0.1", 3001, drop_packet_for_index = 200)  # 3 Acks duplicados para o pacote de índice 500
+server = SimplifiedTCP("127.0.0.1", 3001, max_window_size = 16384)
 logging.warning("Servidor iniciado. Aguardando conexão...")
-server.listen_until_peer_closes()
+server.listen_until_peer_closes(app_processing_delay=0.02)
 
-logging.warning("Quantidade de pacotes recebidos: %d", server.application_buffer.qsize())
+logging.warning("Quantidade de pacotes recebidos: %d", server.received_packet_count)
 
 logging.warning("Conexão fechada. Plotando métricas...")
 server_metrics_path = os.path.join(ROOT_DIR, "metrics-server.png")

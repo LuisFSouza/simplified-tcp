@@ -21,13 +21,14 @@ class SendWorker:
     def has_pending(self):
         with self._pending_lock:
             return bool(self._pending)
-        
+
     def _run(self):
         while not self.context.stop_threads:
             if not self._is_established():
                 time.sleep(0.05)
                 continue
 
+            # Carrega próximo bloco de dados pendentes se necessário
             with self._pending_lock:
                 if not self._pending:
                     data = self._get_next_payload()
@@ -40,43 +41,69 @@ class SendWorker:
                 cwnd = int(self.context.congestion_control.get_cwnd())
                 rwnd = self.context.remote_receiver_window
 
-                # Registra métricas SEMPRE, independente de conseguir enviar
                 self._record_metrics(bytes_in_flight)
+
+                # Janela do receptor zerada: envia probe de 1 byte para forçar atualização da rwnd
+                if rwnd == 0:
+                    current_time = time.time()
+                    if (current_time - self.last_window_probe) >= self.window_probe_interval:
+                        logging.warning(
+                            f"[WINDOW PROBE] Receiver window zerada. Enviando probe de 1 byte. "
+                            f"bytes_in_flight={bytes_in_flight}, cwnd={cwnd}"
+                        )
+                        self.context.metrics.record_probe()
+                        # Probe de 1 byte: força o receptor a responder com recv_window atualizado.
+                        # O byte é extraído dos dados pendentes para não inventar conteúdo.
+                        with self._pending_lock:
+                            if self._pending:
+                                probe_byte = self._pending[:1]
+                                self._pending = self._pending[1:]
+                            else:
+                                probe_byte = b"\x00"
+                        self.context.send_packet(payload=probe_byte)
+                        self.last_window_probe = current_time
+                    else:
+                        time.sleep(0.001)
+                    continue
+
+            
+                cwnd_space = cwnd - bytes_in_flight
+                rwnd_space = rwnd - bytes_in_flight
 
                 with self._pending_lock:
                     if not self._pending:
                         continue
-                    chunk_size = min(self.mss, len(self._pending))
+                    pending_len = len(self._pending)
 
-                if bytes_in_flight + chunk_size > cwnd:
+                available_space = min(cwnd_space, rwnd_space, self.mss, pending_len)
+
+                if available_space <= 0:
+                    if cwnd_space <= 0:
+                        # logging.info(
+                        #     f"[CONGESTION CONTROL] Envio bloqueado por CWND. "
+                        #     f"bytes_in_flight={bytes_in_flight}, cwnd={cwnd} (espaço={cwnd_space})"
+                        # )
+                        self.context.metrics.record_block("cwnd")
+                    elif rwnd_space <= 0:
+                        logging.info(
+                            f"[FLOW CONTROL] Envio bloqueado por RWND. "
+                            f"bytes_in_flight={bytes_in_flight}, rwnd={rwnd} (espaço={rwnd_space})"
+                        )
+                    else:
+                        # logging.info(
+                        #     f"[SEND LIMIT] Envio aguardando tamanho mínimo. "
+                        #     f"pending_len={pending_len}, mss={self.mss}"
+                        # )
+                        self.context.metrics.record_block("rwnd")
                     time.sleep(0.001)
                     continue
-                
-                if bytes_in_flight + chunk_size > rwnd:
-                    current_time = time.time()
-                    if rwnd == 0 and (current_time - self.last_window_probe) >= self.window_probe_interval:
-                        logging.warning(
-                            f"[WINDOW PROBE] Receiver window zerada. Enviando probe vazio. "
-                            f"bytes_in_flight={bytes_in_flight}, cwnd={cwnd}"
-                        )
-                        self.context.send_packet(payload=b"")
-                        self.last_window_probe = current_time
-                        continue
-                    else:
-                        logging.warning(
-                            f"[FLOW CONTROL] Envio bloqueado por receiver window. "
-                            f"bytes_in_flight={bytes_in_flight}, chunk_size={chunk_size}, "
-                            f"rwnd={rwnd}, cwnd={cwnd}"
-                        )
-                        time.sleep(0.001)
-                        continue
 
                 with self._pending_lock:
-                    chunk = self._pending[:chunk_size]
-                    self._pending = self._pending[chunk_size:]
+                    chunk = self._pending[:available_space]
+                    self._pending = self._pending[available_space:]
 
                 logging.info(
-                    f"[SEND] bytes_in_flight={bytes_in_flight}, chunk_size={chunk_size}, "
+                    f"[SEND] bytes_in_flight={bytes_in_flight}, chunk_size={len(chunk)}, "
                     f"cwnd={cwnd}, rwnd={rwnd}"
                 )
                 self.context.send_packet(payload=chunk)

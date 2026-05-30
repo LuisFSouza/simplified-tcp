@@ -9,9 +9,17 @@ class MetricsCollector:
         self.received = {"timestamps": [], "received_bytes": []}
         self.retransmit = {"timestamps": [], "retransmissions": []}
         self.rtt = {"timestamps": [], "rtt_ms": []}
+        self.probes = {"timestamps": [], "count": []}
+        self.blocks_rwnd = {"timestamps": [], "count": []}
+        self.blocks_cwnd = {"timestamps": [], "count": []}
+        
         self._acked_total = 0
         self._received_total = 0
         self._retransmit_total = 0
+        
+        self._probe_total = 0
+        self._block_rwnd_total = 0
+        self._block_cwnd_total = 0
 
     def record_window(self, cwnd, ssthresh, bytes_in_flight, send_queue_size):
         self.window["timestamps"].append(time.time())
@@ -45,26 +53,46 @@ class MetricsCollector:
         self.rtt["timestamps"].append(time.time())
         self.rtt["rtt_ms"].append(rtt_seconds * 1000)
 
-    def plot(self, output_path="metrics-{}.png".format(time.time()), show=True):
+    def record_probe(self):
+        self._probe_total += 1
+        self.probes["timestamps"].append(time.time())
+        self.probes["count"].append(self._probe_total)
+
+    def record_block(self, reason):
+        if reason == "rwnd":
+            self._block_rwnd_total += 1
+            self.blocks_rwnd["timestamps"].append(time.time())
+            self.blocks_rwnd["count"].append(self._block_rwnd_total)
+        elif reason == "cwnd":
+            self._block_cwnd_total += 1
+            self.blocks_cwnd["timestamps"].append(time.time())
+            self.blocks_cwnd["count"].append(self._block_cwnd_total)
+            
+    def plot(self, output_path=None, show=True):
+        if output_path is None:
+            output_path = "metrics-{}.png".format(time.time())
+            
         starts = []
-        for series in (self.window, self.ack, self.received, self.retransmit, self.rtt):
+        for series in (self.window, self.ack, self.received, self.retransmit, self.rtt, self.probes, self.blocks_rwnd, self.blocks_cwnd):
             if series["timestamps"]:
                 starts.append(series["timestamps"][0])
+                
         if not starts:
             logging.warning("Nenhuma metrica coletada para plotar.")
             return
 
         start = min(starts)
 
-        # antes: _, axes = plt.subplots(2, 3, figsize=(16, 8))
-        _, ax = plt.subplots(1, 1, figsize=(8, 6))
-
-        self._plot_window_metrics(ax, start)
-        # self._plot_bytes_in_flight(axes[0, 1], start)
-        # self._plot_rtt(axes[0, 2], start)
-        # self._plot_throughput(axes[1, 0], start)
-        # self._plot_cumulative_events(axes[1, 1], start)
-        # self._plot_retransmissions(axes[1, 2], start)
+        fig, axes = plt.subplots(4, 2, figsize=(16, 16))
+        
+        self._plot_window_metrics(axes[0, 0], start)
+        self._plot_bytes_in_flight(axes[0, 1], start)
+        self._plot_rtt(axes[1, 0], start)
+        self._plot_throughput(axes[1, 1], start)
+        self._plot_cumulative_events(axes[2, 0], start)
+        self._plot_retransmissions(axes[2, 1], start)
+        self._plot_blocks(axes[3, 0], start)
+        self._plot_probes(axes[3, 1], start)
 
         plt.tight_layout()
         plt.savefig(output_path)
@@ -160,5 +188,36 @@ class MetricsCollector:
         axis.set_title("Retransmissions")
         axis.set_xlabel("Time (s)")
         axis.set_ylabel("Count")
+        if plotted:
+            axis.legend()
+            
+    def _plot_blocks(self, axis, start):
+        plotted = False
+        if self.blocks_rwnd["timestamps"]:
+            ts = self._relative_time(self.blocks_rwnd["timestamps"], start)
+            axis.step(ts, self.blocks_rwnd["count"], where="post", label="Blocks by Flow (RWND)", color="red", alpha=0.7)
+            plotted = True
+        if self.blocks_cwnd["timestamps"]:
+            ts = self._relative_time(self.blocks_cwnd["timestamps"], start)
+            axis.step(ts, self.blocks_cwnd["count"], where="post", label="Blocks by Congestion (CWND)", color="blue", alpha=0.7)
+            plotted = True
+            
+        axis.set_title("Bloqueios de Transmissão")
+        axis.set_xlabel("Time (s)")
+        axis.set_ylabel("Contagem Cumulativa")
+        if plotted:
+            axis.legend()
+
+    def _plot_probes(self, axis, start):
+        plotted = False
+        if self.probes["timestamps"]:
+            ts = self._relative_time(self.probes["timestamps"], start)
+            axis.step(ts, self.probes["count"], where="post", label="Window Probes", color="orange")
+            axis.scatter(ts, self.probes["count"], s=16, color="orange")
+            plotted = True
+            
+        axis.set_title("Window Probes Enviados")
+        axis.set_xlabel("Time (s)")
+        axis.set_ylabel("Quantidade")
         if plotted:
             axis.legend()
