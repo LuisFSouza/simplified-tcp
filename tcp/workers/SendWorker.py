@@ -28,7 +28,6 @@ class SendWorker:
                 time.sleep(0.05)
                 continue
 
-            # Carrega próximo bloco de dados pendentes se necessário
             with self._pending_lock:
                 if not self._pending:
                     data = self._get_next_payload()
@@ -43,7 +42,6 @@ class SendWorker:
 
                 self._record_metrics(bytes_in_flight)
 
-                # Janela do receptor zerada: envia probe de 1 byte para forçar atualização da rwnd
                 if rwnd == 0:
                     current_time = time.time()
                     if (current_time - self.last_window_probe) >= self.window_probe_interval:
@@ -52,8 +50,7 @@ class SendWorker:
                             f"bytes_in_flight={bytes_in_flight}, cwnd={cwnd}"
                         )
                         self.context.metrics.record_probe()
-                        # Probe de 1 byte: força o receptor a responder com recv_window atualizado.
-                        # O byte é extraído dos dados pendentes para não inventar conteúdo.
+                        # Probe de 1 byte
                         with self._pending_lock:
                             if self._pending:
                                 probe_byte = self._pending[:1]
