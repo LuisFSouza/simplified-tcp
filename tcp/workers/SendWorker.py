@@ -86,12 +86,13 @@ class SendWorker:
                             f"[FLOW CONTROL] Envio bloqueado por RWND. "
                             f"bytes_in_flight={bytes_in_flight}, rwnd={rwnd} (espaço={rwnd_space})"
                         )
+                        self.context.metrics.record_block("rwnd")
                     else:
                         # logging.info(
                         #     f"[SEND LIMIT] Envio aguardando tamanho mínimo. "
                         #     f"pending_len={pending_len}, mss={self.mss}"
                         # )
-                        self.context.metrics.record_block("rwnd")
+                        pass
                     time.sleep(0.001)
                     continue
 

@@ -202,9 +202,9 @@ class MetricsCollector:
             axis.step(ts, self.blocks_cwnd["count"], where="post", label="Blocks by Congestion (CWND)", color="blue", alpha=0.7)
             plotted = True
             
-        axis.set_title("Bloqueios de Transmissão")
+        axis.set_title("Transmission Blocks")
         axis.set_xlabel("Time (s)")
-        axis.set_ylabel("Contagem Cumulativa")
+        axis.set_ylabel("Cumulative Count")
         if plotted:
             axis.legend()
 
@@ -216,8 +216,8 @@ class MetricsCollector:
             axis.scatter(ts, self.probes["count"], s=16, color="orange")
             plotted = True
             
-        axis.set_title("Window Probes Enviados")
+        axis.set_title("Window Probes Sent")
         axis.set_xlabel("Time (s)")
-        axis.set_ylabel("Quantidade")
+        axis.set_ylabel("Count")
         if plotted:
             axis.legend()
