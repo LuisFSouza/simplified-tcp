@@ -6,7 +6,7 @@
 
 ## Cenário
 
-A execução é sobre o envio de 1.024.000 bytes do cliente para o servidor. A simulação aqui é com um buffer de recepção de tamanho de 16384 bytes.
+A execução é sobre o envio de 1024000 bytes do cliente para o servidor. A simulação aqui é com um buffer de recepção de tamanho de 16384 bytes.
 
 ### Comportamento observado
 - Considerando o gráfico `Congestion Window`, rapidamente `cwnd` ultrapassa o valor máximo do buffer do receptor. Isso significa, que bem no inicio da transmissão (quando `cwnd` < 16384), quem determina a janela de transmissão é o controle de congestionamento. A partir do momento em que `cwnd` > 16384, quem começa a controlar a janela de transmissão é o controle de fluxo, ja que o tamanho máximo do buffer é 16384, e o `cwnd` tem valor superior. Isso é oque demonstra o gráfico `Transmission Blocks`, onde bem no começo o controle de congestionamento é quem bloqueia a transmissão, e após `cwnd` > 16384, o controle de fluxo passa a bloquear.
